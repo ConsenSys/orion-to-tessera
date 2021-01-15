@@ -1,7 +1,6 @@
 package net.consensys.tessera.migration;
 
 import com.quorum.tessera.config.Config;
-import com.quorum.tessera.config.util.JaxbUtil;
 import net.consensys.tessera.migration.config.MigrateConfigCommand;
 import net.consensys.tessera.migration.data.InputType;
 import net.consensys.tessera.migration.data.MigrateDataCommand;
@@ -11,8 +10,6 @@ import org.iq80.leveldb.Options;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.concurrent.Callable;
@@ -34,7 +31,7 @@ public class MigrateCommand implements Callable<Config> {
     private boolean verbose;
 
     @CommandLine.Mixin
-    private TesseraJdbcOptions tesseraJdbcOptions;
+    private TesseraJdbcOptions tesseraJdbcOptions = new TesseraJdbcOptions();
 
     public static class InboundDBArgs {
         private String jdbcUrl;
@@ -74,16 +71,9 @@ public class MigrateCommand implements Callable<Config> {
     @Override
     public Config call() throws Exception {
 
-        MigrateConfigCommand migrateConfigCommand = new MigrateConfigCommand(orionKeyHelper.getFilePath(),outputFile,skipValidation,verbose);
+        MigrateConfigCommand migrateConfigCommand
+                = new MigrateConfigCommand(orionKeyHelper.getFilePath(), outputFile, skipValidation, verbose, tesseraJdbcOptions);
         Config config = migrateConfigCommand.call();
-
-        config.getJdbcConfig().setUsername(tesseraJdbcOptions.getUsername());
-        config.getJdbcConfig().setPassword(tesseraJdbcOptions.getPassword());
-        config.getJdbcConfig().setUrl(tesseraJdbcOptions.getUrl());
-
-        try(OutputStream outputStream = new  TeeOutputStream(Files.newOutputStream(outputFile),System.out)) {
-            JaxbUtil.marshalWithNoValidation(config, outputStream);
-        }
 
         InboundDBArgs args = createArgs(orionKeyHelper.getConfig().storage(), orionKeyHelper.getConfig().workDir(), "routerdb");
         MigrateDataCommand migrateDataCommand = new MigrateDataCommand(args,tesseraJdbcOptions,orionKeyHelper);

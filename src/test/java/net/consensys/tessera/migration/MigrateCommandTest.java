@@ -49,7 +49,8 @@ public class MigrateCommandTest {
                 "tessera.jdbc.url","jdbc:h2:./build/testdb;MODE=Oracle;TRACE_LEVEL_SYSTEM_OUT=0",
                 "tessera.db.action","drop-and-create",
                 "orionconfig",orionConfigFile.toString(),
-                "outputfile",outputFile.toAbsolutePath().toString()
+                "outputfile",outputFile.toAbsolutePath().toString(),
+                "skipValidation"
         };
 
         CommandLine.ParseResult parseResult = commandLine.parseArgs(args);
@@ -75,7 +76,8 @@ public class MigrateCommandTest {
                 "tessera.jdbc.url", dburl,
                 "tessera.db.action","drop-and-create",
                 "orionconfig",file,
-                "outputfile",outputFile.toString()
+                "outputfile",outputFile.toString(),
+                "skipValidation"
         };
 
         CommandLine.ParseResult result = commandLine.parseArgs(args);

@@ -2,13 +2,16 @@ package net.consensys.tessera.migration.config;
 
 import com.moandjiezana.toml.Toml;
 import com.quorum.tessera.config.*;
+import com.quorum.tessera.config.util.JaxbUtil;
+import net.consensys.tessera.migration.TeeOutputStream;
+import net.consensys.tessera.migration.data.TesseraJdbcOptions;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
@@ -22,18 +25,39 @@ public class MigrateConfigCommand implements Callable<Config> {
 
     private boolean verbose;
 
-    private Map<String,String> jdbcProperties;
+    private TesseraJdbcOptions tesseraJdbcOptions;
 
-    public MigrateConfigCommand(Path orionConfigFile, Path outputFile, boolean skipValidation, boolean verbose) {
+    public MigrateConfigCommand(Path orionConfigFile,
+                                Path outputFile,
+                                boolean skipValidation,
+                                boolean verbose,
+                                TesseraJdbcOptions tesseraJdbcOptions) {
         this.orionConfigFile = orionConfigFile;
         this.outputFile = outputFile;
         this.skipValidation = skipValidation;
         this.verbose = verbose;
+        this.tesseraJdbcOptions = tesseraJdbcOptions;
     }
 
     @Override
-    public Config call() throws Exception {
+    public Config call() throws IOException {
+        Config config = createConfig();
+        config.getJdbcConfig().setUsername(tesseraJdbcOptions.getUsername());
+        config.getJdbcConfig().setPassword(tesseraJdbcOptions.getPassword());
+        config.getJdbcConfig().setUrl(tesseraJdbcOptions.getUrl());
 
+        try (OutputStream outputStream = new TeeOutputStream(Files.newOutputStream(outputFile), System.out)) {
+            if (skipValidation) {
+                JaxbUtil.marshalWithNoValidation(config, outputStream);
+            } else {
+                JaxbUtil.marshal(config, outputStream);
+            }
+        }
+
+        return config;
+    }
+
+    private Config createConfig() {
         Toml toml = new Toml().read(orionConfigFile.toAbsolutePath().toFile());
 
         String knownnodesstorage = toml.getString("knownnodesstorage");
@@ -92,8 +116,8 @@ public class MigrateConfigCommand implements Callable<Config> {
         ServerConfig q2tServer = ServerConfigBuilder.create()
                 .withAppType(AppType.Q2T)
                 .withSocketFile(socketfile)
-           //     .withServerPort(clientport)
-           //     .withServerAddress(clienturl)
+                //     .withServerPort(clientport)
+                //     .withServerAddress(clienturl)
 //                .withSslConfig(SslConfigBuilder.create()
 //                        .withClientTrustMode(clientconnectiontls)
 //                        .withClientKeyStore(tlsclientkey)
@@ -135,9 +159,9 @@ public class MigrateConfigCommand implements Callable<Config> {
 
         config.setKeys(
                 KeyConfigBuilder.create()
-                    .withPrivateKeys(privateKeys)
-                    .withPublicKeys(publicKeys)
-                    .withPasswordsFile(passwordsFile).build()
+                        .withPrivateKeys(privateKeys)
+                        .withPublicKeys(publicKeys)
+                        .withPasswordsFile(passwordsFile).build()
         );
 
         return config;
