@@ -7,7 +7,6 @@ import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr353.JSR353Module;
 import com.lmax.disruptor.BlockingWaitStrategy;
-import com.lmax.disruptor.FatalExceptionHandler;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.quorum.tessera.encryption.Encryptor;
@@ -31,7 +30,7 @@ public class MigrateDataCommand implements Callable<Boolean> {
 
     private Encryptor tesseraEncryptor = EncryptorFactory.newFactory("NACL").create();
 
-    private MigrateCommand.Args args;
+    private MigrateCommand.InboundDBArgs args;
 
     private ObjectMapper cborObjectMapper = JsonMapper.builder(new CBORFactory())
             .addModule(new Jdk8Module())
@@ -54,7 +53,9 @@ public class MigrateDataCommand implements Callable<Boolean> {
         return Persistence.createEntityManagerFactory("tessera-em", jdbcProperties);
     }
 
-    public MigrateDataCommand(MigrateCommand.Args args,TesseraJdbcOptions tesseraJdbcOptions,OrionKeyHelper orionKeyHelper) {
+    public MigrateDataCommand(MigrateCommand.InboundDBArgs args,
+                              TesseraJdbcOptions tesseraJdbcOptions,
+                              OrionKeyHelper orionKeyHelper) {
         this.args = args;
         this.tesseraJdbcOptions = tesseraJdbcOptions;
         this.orionKeyHelper = orionKeyHelper;
@@ -64,12 +65,8 @@ public class MigrateDataCommand implements Callable<Boolean> {
     public Boolean call() throws Exception {
 
 
-        Disruptor<OrionRecordEvent> disruptor = new Disruptor<>(OrionRecordEvent.FACTORY, 128, new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                return new Thread(r);
-            }
-        }, ProducerType.SINGLE, new BlockingWaitStrategy());
+        Disruptor<OrionRecordEvent> disruptor
+                = new Disruptor<>(OrionRecordEvent.FACTORY, 128, (ThreadFactory) Thread::new, ProducerType.SINGLE, new BlockingWaitStrategy());
 
 
         InputType inputType = args.inputType();
@@ -78,9 +75,9 @@ public class MigrateDataCommand implements Callable<Boolean> {
         final PrivacyGroupPayloadLookup privacyGroupPayloadLookup;
         switch (inputType) {
             case LEVELDB:
-                inboundAdapter = new LevelDbOrionDataAdapter(args.getLevelDbArgs().getLeveldb(),cborObjectMapper,disruptor);
-                recordCounter = new LevelDbRecordCounter(args.getLevelDbArgs().getLeveldb(),cborObjectMapper);
-                privacyGroupPayloadLookup = new LeveldbPrivacyGroupPayloadLookup(args.getLevelDbArgs().getLeveldb(),cborObjectMapper);
+                inboundAdapter = new LevelDbOrionDataAdapter(args.getLevelDb(),cborObjectMapper,disruptor);
+                recordCounter = new LevelDbRecordCounter(args.getLevelDb(),cborObjectMapper);
+                privacyGroupPayloadLookup = new LeveldbPrivacyGroupPayloadLookup(args.getLevelDb(),cborObjectMapper);
                 break;
             case JDBC:
                 inboundAdapter = new JdbcOrionDataAdapter(args.getJdbcArgs(),cborObjectMapper,orionKeyHelper);

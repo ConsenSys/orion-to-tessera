@@ -4,15 +4,10 @@ import com.quorum.tessera.config.Config;
 import com.quorum.tessera.config.EncryptorType;
 import com.quorum.tessera.config.util.JaxbUtil;
 import net.consensys.tessera.migration.config.JdbcConfigBuilder;
-import net.consensys.tessera.migration.data.LevelDbCmdConvertor;
-import org.iq80.leveldb.DB;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import picocli.CommandLine;
 
-import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
@@ -38,12 +33,6 @@ public class MigrateCommandTest {
         commandLine = new CommandLine(migrateCommand)
                 .setCaseInsensitiveEnumValuesAllowed(true);
         commandLine.registerConverter(OrionKeyHelper.class,new OrionKeyHelperConvertor());
-        commandLine.registerConverter(DB.class,new LevelDbCmdConvertor());
-    }
-
-    @After
-    public void afterTest() throws Exception {
-
     }
 
     @Test
@@ -51,26 +40,20 @@ public class MigrateCommandTest {
         commandLine.execute();
     }
 
-
-
     @Test
-    public void levelDb() throws Exception {
-
-        URI uri = getClass().getResource("/routerdb").toURI();
+    public void levelDb() {
 
         String[] args = new String[] {
                 "tessera.jdbc.user", "junituser",
                 "tessera.jdbc.password", "junitpassword",
                 "tessera.jdbc.url","jdbc:h2:./build/testdb;MODE=Oracle;TRACE_LEVEL_SYSTEM_OUT=0",
                 "tessera.db.action","drop-and-create",
-                "leveldb",uri.toString(),
                 "orionconfig",orionConfigFile.toString(),
                 "outputfile",outputFile.toAbsolutePath().toString()
         };
 
         CommandLine.ParseResult parseResult = commandLine.parseArgs(args);
 
-        assertThat(parseResult.hasMatchedOption("leveldb")).isTrue();
         assertThat(parseResult.hasMatchedOption("orionconfig")).isTrue();
 
         int exitCode = commandLine.execute(args);
@@ -79,23 +62,18 @@ public class MigrateCommandTest {
     }
 
     @Test
-    public void loadFullConfigSample() throws Exception {
-
-        URI uri = getClass().getResource("/routerdb").toURI();
-
+    public void loadFullConfigSample() {
         String file = getClass().getResource("/fullConfigTest.toml").getFile();
 
         String dbuser = "junituser";
         String dbpassword = "junitpassword";
-        String dburl = "jdbc:h2:./build/testdb;MODE=Oracle;TRACE_LEVEL_SYSTEM_OUT=0";
-
+        String dburl = "jdbc:h2:./build/testdb2;MODE=Oracle;TRACE_LEVEL_SYSTEM_OUT=0";
 
         String[] args = new String[] {
                 "tessera.jdbc.user", dbuser,
                 "tessera.jdbc.password", dbpassword,
                 "tessera.jdbc.url", dburl,
                 "tessera.db.action","drop-and-create",
-                "leveldb",uri.toString(),
                 "orionconfig",file,
                 "outputfile",outputFile.toString()
         };
@@ -114,16 +92,10 @@ public class MigrateCommandTest {
 
         JaxbUtil.marshalWithNoValidation(config,System.out);
 
-
         assertThat(config.getJdbcConfig()).isEqualTo(JdbcConfigBuilder.create()
                 .withUser(dbuser)
                 .withUrl(dburl)
                 .withPassword(dbpassword)
                 .build());
-
-
-
-
-
     }
 }

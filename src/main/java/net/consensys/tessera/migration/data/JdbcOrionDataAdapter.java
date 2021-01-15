@@ -2,7 +2,6 @@ package net.consensys.tessera.migration.data;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lmax.disruptor.dsl.Disruptor;
-import net.consensys.tessera.migration.MigrateCommand;
 import net.consensys.tessera.migration.OrionKeyHelper;
 
 import javax.json.JsonObject;
@@ -14,7 +13,7 @@ import java.util.Objects;
 
 public class JdbcOrionDataAdapter implements OrionDataAdapter {
 
-    private final MigrateCommand.InboundJdbcArgs jdbcConfig;
+    private final String jdbcUrl;
 
     private final ObjectMapper cborObjectMapper;
 
@@ -22,11 +21,8 @@ public class JdbcOrionDataAdapter implements OrionDataAdapter {
 
     private Disruptor<OrionRecordEvent> disruptor;
 
-    public JdbcOrionDataAdapter(MigrateCommand.InboundJdbcArgs jdbcConfig,
-                                ObjectMapper cborObjectMapper,
-                                OrionKeyHelper orionKeyHelper) {
-
-        this.jdbcConfig = Objects.requireNonNull(jdbcConfig);
+    public JdbcOrionDataAdapter(String jdbcUrl, ObjectMapper cborObjectMapper, OrionKeyHelper orionKeyHelper) {
+        this.jdbcUrl = Objects.requireNonNull(jdbcUrl);
         this.cborObjectMapper = Objects.requireNonNull(cborObjectMapper);
         this.orionKeyHelper = Objects.requireNonNull(orionKeyHelper);
     }
@@ -34,7 +30,7 @@ public class JdbcOrionDataAdapter implements OrionDataAdapter {
     @Override
     public void start() throws Exception {
 
-        Connection connection = DriverManager.getConnection(jdbcConfig.getUrl(),jdbcConfig.getUsername(), jdbcConfig.getPassword());
+        Connection connection = DriverManager.getConnection(jdbcUrl);
         Statement statement = connection.createStatement();
         ResultSet resultSet = statement.executeQuery("SELECT * FROM STORE");
         try(connection;statement;resultSet) {

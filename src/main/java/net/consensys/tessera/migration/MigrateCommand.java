@@ -7,84 +7,62 @@ import net.consensys.tessera.migration.data.InputType;
 import net.consensys.tessera.migration.data.MigrateDataCommand;
 import net.consensys.tessera.migration.data.TesseraJdbcOptions;
 import org.iq80.leveldb.DB;
+import org.iq80.leveldb.Options;
 import picocli.CommandLine;
 
+import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 
+import static org.fusesource.leveldbjni.JniDBFactory.factory;
+
 public class MigrateCommand implements Callable<Config> {
 
-    @CommandLine.Option(names = {"-f","orionfile","orionconfig"},required = true)
+    @CommandLine.Option(names = {"-f", "orionfile", "orionconfig"}, required = true, description = "Orion config file")
     private OrionKeyHelper orionKeyHelper;
 
-    @CommandLine.Option(names = {"-o","outputfile"},required = true)
+    @CommandLine.Option(names = {"-o", "outputfile"}, required = true, description = "Output Tessera config file")
     private Path outputFile;
 
-    @CommandLine.Option(names = {"-sv","skipValidation"})
+    @CommandLine.Option(names = {"-sv", "skipValidation"})
     private boolean skipValidation;
 
-    @CommandLine.Option(names = {"-v","--verbose"})
+    @CommandLine.Option(names = {"-v", "--verbose"})
     private boolean verbose;
 
     @CommandLine.Mixin
     private TesseraJdbcOptions tesseraJdbcOptions;
 
-    public static class InboundJdbcArgs {
-        @CommandLine.Option(names = {"jdbc.user"},required = true)
-        private String username;
+    public static class InboundDBArgs {
+        private String jdbcUrl;
 
-        @CommandLine.Option(names = {"jdbc.password"},required = true)
-        private String password;
-
-        @CommandLine.Option(names = "jdbc.url",required = true)
-        private String url;
-
-        public String getUsername() {
-            return username;
-        }
-
-        public String getPassword() {
-            return password;
-        }
-
-        public String getUrl() {
-            return url;
-        }
-    }
-
-    public static class LevelDbArgs {
-        @CommandLine.Option(names = "leveldb", required = true)
         private org.iq80.leveldb.DB leveldb;
 
-        public DB getLeveldb() {
+        public String getJdbcArgs() {
+            return jdbcUrl;
+        }
+
+        public org.iq80.leveldb.DB getLevelDb() {
             return leveldb;
         }
-    }
 
-    public static class Args {
-        @CommandLine.ArgGroup(exclusive = false, multiplicity = "1", heading = "Jdbc input args%n")
-        private InboundJdbcArgs jdbcArgs;
-
-        @CommandLine.ArgGroup(exclusive = false, multiplicity = "1", heading = "LevelDb input args%n")
-        private LevelDbArgs levelDbArgs;
-
-        public InboundJdbcArgs getJdbcArgs() {
-            return jdbcArgs;
+        public void setJdbcUrl(String jdbcUrl) {
+            this.jdbcUrl = jdbcUrl;
         }
 
-        public LevelDbArgs getLevelDbArgs() {
-            return levelDbArgs;
+        public void setLevelDb(org.iq80.leveldb.DB leveldb) {
+            this.leveldb = leveldb;
         }
 
         public InputType inputType() {
-            if(Objects.nonNull(jdbcArgs)) {
+            if(Objects.nonNull(jdbcUrl)) {
                 return InputType.JDBC;
             }
 
-            if(Objects.nonNull(levelDbArgs)) {
+            if(Objects.nonNull(leveldb)) {
                 return InputType.LEVELDB;
             }
 
@@ -92,9 +70,6 @@ public class MigrateCommand implements Callable<Config> {
         }
 
     }
-
-    @CommandLine.ArgGroup(exclusive = true, multiplicity = "1")
-    private Args args;
 
     @Override
     public Config call() throws Exception {
@@ -110,13 +85,42 @@ public class MigrateCommand implements Callable<Config> {
             JaxbUtil.marshalWithNoValidation(config, outputStream);
         }
 
+        InboundDBArgs args = createArgs(orionKeyHelper.getConfig().storage(), orionKeyHelper.getConfig().workDir(), "routerdb");
         MigrateDataCommand migrateDataCommand = new MigrateDataCommand(args,tesseraJdbcOptions,orionKeyHelper);
 
         boolean outcome = migrateDataCommand.call();
 
-
         return config;
     }
 
+    private InboundDBArgs createArgs(final String storage, final Path storagePath, String dbName) {
+        final String[] storageOptions = storage.split(":", 2);
+        if (storageOptions.length > 1) {
+            dbName = storageOptions[1];
+        }
 
+        if (storage.toLowerCase().startsWith("leveldb")) {
+            try {
+                Options options = new Options();
+                options.logger(System.out::println);
+                options.createIfMissing(true);
+
+                DB open = factory.open(storagePath.resolve(dbName).toAbsolutePath().toFile(), options);
+
+                InboundDBArgs args = new InboundDBArgs();
+                args.setLevelDb(open);
+                return args;
+            } catch (final IOException e) {
+                throw new RuntimeException("Couldn't create LevelDB store: " + dbName, e);
+            }
+        }
+
+        if (storage.toLowerCase().startsWith("sql")) {
+            InboundDBArgs args = new InboundDBArgs();
+            args.setJdbcUrl(dbName);
+            return args;
+        }
+
+        throw new UnsupportedOperationException("unsupported storage mechanism: " + storage);
+    }
 }

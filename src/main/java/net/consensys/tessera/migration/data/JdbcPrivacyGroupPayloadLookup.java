@@ -3,7 +3,6 @@ package net.consensys.tessera.migration.data;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.consensys.orion.enclave.EncryptedPayload;
 import net.consensys.orion.enclave.PrivacyGroupPayload;
-import net.consensys.tessera.migration.MigrateCommand;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -13,12 +12,12 @@ import java.util.Optional;
 
 public class JdbcPrivacyGroupPayloadLookup implements PrivacyGroupPayloadLookup{
 
-    private final MigrateCommand.InboundJdbcArgs jdbcConfig;
+    private final String jdbcUrl;
 
     private ObjectMapper objectMapper;
 
-    public JdbcPrivacyGroupPayloadLookup(MigrateCommand.InboundJdbcArgs jdbcConfig,ObjectMapper objectMapper) {
-        this.jdbcConfig = jdbcConfig;
+    public JdbcPrivacyGroupPayloadLookup(String jdbcUrl, ObjectMapper objectMapper) {
+        this.jdbcUrl = jdbcUrl;
         this.objectMapper = objectMapper;
     }
 
@@ -46,7 +45,7 @@ public class JdbcPrivacyGroupPayloadLookup implements PrivacyGroupPayloadLookup{
     }
 
     byte[] getPrivacyGroupPayloadData(byte[] privacyGroupId) throws SQLException {
-        Connection connection = DriverManager.getConnection(jdbcConfig.getUrl(),jdbcConfig.getUsername(),jdbcConfig.getPassword());
+        Connection connection = DriverManager.getConnection(jdbcUrl);
         PreparedStatement statement = connection.prepareStatement("SELECT VALUE FROM STORE WHERE KEY = ?");
 
         byte[] encodedPrivacyGroupId = Base64.getEncoder().encode(privacyGroupId);
