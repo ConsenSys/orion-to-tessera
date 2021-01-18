@@ -125,6 +125,7 @@ dependencies {
 //        transitive = false
 //    }
 
+    implementation 'org.mapdb:mapdb:3.0.8'
     implementation("org.iq80.leveldb:leveldb:0.12") {
         transitive = false
     }

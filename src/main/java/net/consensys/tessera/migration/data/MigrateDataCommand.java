@@ -74,6 +74,11 @@ public class MigrateDataCommand implements Callable<Boolean> {
         final OrionDataAdapter inboundAdapter;
         final PrivacyGroupPayloadLookup privacyGroupPayloadLookup;
         switch (inputType) {
+            case MAPDB:
+                inboundAdapter = new KeyValueStoreOrionDataAdapter(args.getMapDB(), cborObjectMapper,disruptor);
+                recordCounter = new KeyValueStoreRecordCounter(args.getMapDB(), cborObjectMapper);
+                privacyGroupPayloadLookup = new KeyValueStorePrivacyGroupPayloadLookup(args.getMapDB(), cborObjectMapper);
+                break;
             case LEVELDB:
                 inboundAdapter = new LevelDbOrionDataAdapter(args.getLevelDb(),cborObjectMapper,disruptor);
                 recordCounter = new LevelDbRecordCounter(args.getLevelDb(),cborObjectMapper);
@@ -84,7 +89,8 @@ public class MigrateDataCommand implements Callable<Boolean> {
                 recordCounter = new JdbcRecordCounter(args.getJdbcArgs());
                 privacyGroupPayloadLookup = new JdbcPrivacyGroupPayloadLookup(args.getJdbcArgs(),cborObjectMapper);
                 break;
-            default:throw new UnsupportedOperationException("");
+            default:
+                throw new UnsupportedOperationException("");
         }
 
         EntityManagerFactory entityManagerFactory = createEntityManagerFactory(tesseraJdbcOptions);
